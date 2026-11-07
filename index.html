@@ -671,6 +671,18 @@
     const { createFFmpeg, fetchFile } = FFmpeg;
     let ffmpeg = null;
     let isReady = false;
+    let isProcessing = false;
+
+    function setButtonsDisabled(disabled) {
+      document.querySelectorAll('button.btn').forEach(btn => {
+        btn.disabled = disabled;
+      });
+    }
+
+    function safeUnlink(fileName) {
+      if (!ffmpeg) return;
+      try { ffmpeg.FS('unlink', fileName); } catch (e) {}
+    }
 
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
@@ -960,6 +972,8 @@
     // 1-A. 分割 / 拆軌
     async function handleSplit(mode) {
       if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      if (isProcessing) return;
+
       const fileInput = document.getElementById('splitFile');
       if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
 
@@ -972,34 +986,44 @@
       const e = parseFloat(sliderEnd.value) || 0;
       const hasTimeRange = video && video.duration && (s > 0.05 || e < video.duration - 0.05);
 
+      isProcessing = true;
+      setButtonsDisabled(true);
       showProgress('載入影片資料中...');
 
+      let outName = '';
+      let mediaType = 'video';
+
+      if (mode === 'audio') {
+        outName = `${baseName}_audio.m4a`;
+        mediaType = 'audio';
+      } else if (mode === 'video') {
+        outName = `${baseName}_mute${ext}`;
+        mediaType = 'video';
+      } else {
+        outName = `${baseName}_cut${ext}`;
+        mediaType = 'video';
+      }
+
       try {
+        safeUnlink(inputName);
+        safeUnlink(outName);
+
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
-        let args = [];
+        let args = ['-y'];
         if (hasTimeRange) {
           args.push('-ss', s.toString(), '-to', e.toString());
         }
         args.push('-i', inputName);
 
-        let outName = '';
-        let mediaType = 'video';
-
         if (mode === 'audio') {
-          outName = `${baseName}_audio.m4a`;
           args.push('-vn', '-c:a', 'copy', outName);
-          mediaType = 'audio';
           progressMessage.innerText = '正在抽取聲音...';
         } else if (mode === 'video') {
-          outName = `${baseName}_mute${ext}`;
           args.push('-an', '-c:v', 'copy', outName);
-          mediaType = 'video';
           progressMessage.innerText = '正在抽取畫面...';
         } else {
-          outName = `${baseName}_cut${ext}`;
           args.push('-c', 'copy', outName);
-          mediaType = 'video';
           progressMessage.innerText = '正在剪切片段...';
         }
 
@@ -1010,19 +1034,26 @@
         const blob = new Blob([data.buffer], { type: mime });
 
         showResult(blob, outName, mediaType);
-
-        ffmpeg.FS('unlink', inputName);
-        ffmpeg.FS('unlink', outName);
       } catch (err) {
         console.error(err);
         alert('處理失敗：' + (err.message || err));
         hideProgress();
+        if (err.message && err.message.includes('can only run one command')) {
+          initFFmpeg();
+        }
+      } finally {
+        safeUnlink(inputName);
+        safeUnlink(outName);
+        isProcessing = false;
+        setButtonsDisabled(false);
       }
     }
 
     // 1-B. 轉為動畫 (共用選取的影片與時間軸)
     async function handleMakeAnimation() {
       if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      if (isProcessing) return;
+
       const fileInput = document.getElementById('splitFile');
       if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
 
@@ -1036,18 +1067,23 @@
       const width = document.getElementById('animWidth').value;
       const fps = document.getElementById('animFps').value;
       const format = document.getElementById('animFormat').value;
+      const outName = `${baseName}_anim.${format}`;
 
+      isProcessing = true;
+      setButtonsDisabled(true);
       showProgress('載入影片資料中...');
 
       try {
+        safeUnlink(inputName);
+        safeUnlink(outName);
+
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
-        let args = [];
+        let args = ['-y'];
         if (s > 0) args.push('-ss', s.toString());
         if (e > s) args.push('-to', e.toString());
         args.push('-i', inputName);
 
-        const outName = `${baseName}_anim.${format}`;
         const scaleFilter = width === '-1' ? '' : `scale=${width}:-1:flags=lanczos,`;
 
         if (format === 'gif') {
@@ -1067,19 +1103,26 @@
         const blob = new Blob([data.buffer], { type: mime });
 
         showResult(blob, outName, 'image');
-
-        ffmpeg.FS('unlink', inputName);
-        ffmpeg.FS('unlink', outName);
       } catch (err) {
         console.error(err);
         alert('轉換動畫失敗：' + (err.message || err));
         hideProgress();
+        if (err.message && err.message.includes('can only run one command')) {
+          initFFmpeg();
+        }
+      } finally {
+        safeUnlink(inputName);
+        safeUnlink(outName);
+        isProcessing = false;
+        setButtonsDisabled(false);
       }
     }
 
     // 2. 合併影音
     async function handleMux() {
       if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      if (isProcessing) return;
+
       const vInput = document.getElementById('muxVideoFile');
       const aInput = document.getElementById('muxAudioFile');
 
@@ -1097,15 +1140,22 @@
       const inAudioName = `in_a${aExt}`;
       const outName = `${baseName}_merged.mp4`;
 
+      isProcessing = true;
+      setButtonsDisabled(true);
       showProgress('載入影音資料中...');
 
       try {
+        safeUnlink(inVideoName);
+        safeUnlink(inAudioName);
+        safeUnlink(outName);
+
         ffmpeg.FS('writeFile', inVideoName, await fetchFile(vFile));
         ffmpeg.FS('writeFile', inAudioName, await fetchFile(aFile));
 
         progressMessage.innerText = '合併影音中...';
 
         const args = [
+          '-y',
           '-i', inVideoName,
           '-i', inAudioName,
           '-c:v', 'copy',
@@ -1120,14 +1170,19 @@
         const blob = new Blob([data.buffer], { type: 'video/mp4' });
 
         showResult(blob, outName, 'video');
-
-        ffmpeg.FS('unlink', inVideoName);
-        ffmpeg.FS('unlink', inAudioName);
-        ffmpeg.FS('unlink', outName);
       } catch (err) {
         console.error(err);
         alert('合併失敗：' + (err.message || err));
         hideProgress();
+        if (err.message && err.message.includes('can only run one command')) {
+          initFFmpeg();
+        }
+      } finally {
+        safeUnlink(inVideoName);
+        safeUnlink(inAudioName);
+        safeUnlink(outName);
+        isProcessing = false;
+        setButtonsDisabled(false);
       }
     }
   </script>
