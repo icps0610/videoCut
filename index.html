@@ -994,17 +994,17 @@
         const toPart = hasEnd ? `-to ${formatTimeCmd(e)} ` : '';
 
         if (format === 'gif') {
-          cmdText.innerText = `ffmpeg -y ${sPart}${toPart}-i "${vName}" -filter_complex "[0:v]fps=${fps},${scale}split[a][b];[a]palettegen[p];[b][p]paletteuse" "${base}_anim.gif"`.trim();
+          cmdText.innerText = `ffmpeg -y -i "${vName}" ${sPart}${toPart}-filter_complex "[0:v]fps=${fps},${scale}split[a][b];[a]palettegen[p];[b][p]paletteuse" "${base}_anim.gif"`.trim();
         } else {
           const vfFilter = `fps=${fps},${scale}`.replace(/,$/, '');
-          cmdText.innerText = `ffmpeg -y ${sPart}${toPart}-i "${vName}" -vf "${vfFilter}" -loop 0 "${base}_anim.webp"`.trim();
+          cmdText.innerText = `ffmpeg -y -i "${vName}" ${sPart}${toPart}-vf "${vfFilter}" -loop 0 "${base}_anim.webp"`.trim();
         }
       } else if (activeAction === 'audio') {
-        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -vn -c:a copy "${base}_audio.m4a"`.trim();
+        cmdText.innerText = `ffmpeg -y -i "${vName}" ${timePart}-vn -c:a copy "${base}_audio.m4a"`.trim();
       } else if (activeAction === 'video') {
-        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -an -c:v copy "${base}_mute${ext}"`.trim();
+        cmdText.innerText = `ffmpeg -y -i "${vName}" ${timePart}-an -c:v copy -avoid_negative_ts make_zero "${base}_mute${ext}"`.trim();
       } else {
-        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -c copy "${base}_cut${ext}"`.trim();
+        cmdText.innerText = `ffmpeg -y -i "${vName}" ${timePart}-c copy -avoid_negative_ts make_zero "${base}_cut${ext}"`.trim();
       }
     }
 
@@ -1379,19 +1379,18 @@
 
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
-        let args = ['-y'];
+        let args = ['-y', '-i', inputName];
         if (hasStart) args.push('-ss', formatTimeCmd(s));
         if (hasEnd) args.push('-to', formatTimeCmd(e));
-        args.push('-i', inputName);
 
         if (mode === 'audio') {
           args.push('-vn', '-c:a', 'copy', outName);
           progressMessage.innerText = '正在抽取聲音...';
         } else if (mode === 'video') {
-          args.push('-an', '-c:v', 'copy', outName);
+          args.push('-an', '-c:v', 'copy', '-avoid_negative_ts', 'make_zero', outName);
           progressMessage.innerText = '正在抽取畫面...';
         } else {
-          args.push('-c', 'copy', outName);
+          args.push('-c', 'copy', '-avoid_negative_ts', 'make_zero', outName);
           progressMessage.innerText = '正在剪切片段...';
         }
 
@@ -1472,10 +1471,9 @@
 
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
-        let args = ['-y'];
+        let args = ['-y', '-i', inputName];
         if (hasStart) args.push('-ss', formatTimeCmd(s));
         if (hasEnd) args.push('-to', formatTimeCmd(e));
-        args.push('-i', inputName);
 
         const scaleFilter = width === '-1' ? '' : `scale=${width}:-1:flags=lanczos,`;
 
