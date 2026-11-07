@@ -182,11 +182,122 @@
 
     /* Timeline & Video Preview */
     .timeline-container {
-      margin-top: 1.25rem;
+      position: relative;
+      margin-top: 0.5rem;
+      margin-bottom: 1.25rem;
       background: var(--input-bg);
       border: 1px solid var(--card-border);
       border-radius: 0.75rem;
       padding: 1rem;
+    }
+
+    .btn-remove-video {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      font-size: 1rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      line-height: 1;
+      z-index: 5;
+    }
+    .btn-remove-video:hover {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #ffffff;
+      transform: scale(1.1);
+    }
+
+    .time-input-inline {
+      width: 82px;
+      padding: 0.2rem 0.4rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 0.35rem;
+      color: var(--text-main);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .time-input-inline:focus {
+      border-color: var(--primary);
+    }
+
+    /* Command Card (圖二風格) */
+    .cmd-card {
+      margin-top: 1.5rem;
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      border-radius: 0.65rem;
+      padding: 0.85rem 1rem 1rem 1rem;
+    }
+
+    .cmd-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.65rem;
+    }
+
+    .cmd-title {
+      color: #22c55e;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      flex: 1;
+      margin-right: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .btn-copy {
+      padding: 0.3rem 0.85rem;
+      font-size: 0.825rem;
+      font-weight: 500;
+      color: #f8fafc;
+      background: #334155;
+      border: 1px solid #475569;
+      border-radius: 0.4rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-copy:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .cmd-terminal {
+      background: #000000;
+      border: 1px solid #0f172a;
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      text-align: left;
+    }
+
+    .cmd-terminal code {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.875rem;
+      color: #f8fafc;
+      text-align: left;
+      line-height: 1.6;
+      word-break: break-all;
+      white-space: pre-wrap;
+      margin: 0;
+      padding: 0;
     }
 
     .video-preview-box {
@@ -504,11 +615,7 @@
   <div class="container">
     <header>
       <h1>🎬 VideoCut</h1>
-      <p>極簡純靜態影音工具・完全本機運算</p>
-      <div class="status-badge">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">正在初始化核心...</span>
-      </div>
+      <p>極簡純靜態影音工具</p>
     </header>
 
     <!-- 頂部兩大功能頁籤 -->
@@ -519,7 +626,7 @@
 
     <!-- 頁面 1: 影片處理 (整合剪切、拆軌與轉動畫) -->
     <div id="splitTab" class="panel active">
-      <div class="form-group">
+      <div class="form-group" id="splitDropGroup">
         <label>選取影片</label>
         <div class="dropzone" id="splitDropzone">
           <input type="file" id="splitFile" accept="video/*,.mkv,.mp4,.mov,.webm,.avi">
@@ -530,6 +637,7 @@
 
       <!-- 共用時間軸預覽 -->
       <div class="timeline-container" id="splitTimelineBox" style="display: none;">
+        <button type="button" class="btn-remove-video" onclick="resetSplitVideo()" title="重新選取影片">✕</button>
         <label>時間軸預覽與範圍選取</label>
         <div class="video-preview-box">
           <video id="splitVideo" controls playsinline></video>
@@ -543,13 +651,13 @@
         </div>
 
         <div class="timeline-details">
-          <div>起點: <span class="time-badge" id="splitStartText">00:00.0</span></div>
+          <div>起點: <input type="text" class="time-input-inline" id="splitStartInput" value="00:00.0"></div>
           <div class="timeline-actions">
             <button type="button" class="btn-micro" onclick="setMarker('start')">設為起點</button>
             <button type="button" class="btn-micro" onclick="previewSegment()">預覽區間</button>
             <button type="button" class="btn-micro" onclick="setMarker('end')">設為終點</button>
           </div>
-          <div>終點: <span class="time-badge" id="splitEndText">00:00.0</span></div>
+          <div>終點: <input type="text" class="time-input-inline" id="splitEndInput" value="00:00.0"></div>
         </div>
         <div class="duration-indicator" id="splitDurationText">選取長度: 0.0 秒</div>
       </div>
@@ -662,6 +770,17 @@
       </a>
     </div>
 
+    <!-- 本機終端機指令區 (風格同圖二) -->
+    <div class="cmd-card" id="cmdBox">
+      <div class="cmd-header">
+        <span class="cmd-title">FFmpeg 指令 ( 檔案大於 900MB，受瀏覽器記憶體物理限制，請使用指令)</span>
+        <button type="button" class="btn-copy" id="btnCopyCmd" onclick="copyCommandLine()">複製</button>
+      </div>
+      <div class="cmd-terminal">
+        <code id="cmdText">ffmpeg -y -i "影片.mp4" -c copy "影片_cut.mp4"</code>
+      </div>
+    </div>
+
     <footer>
       VideoCut ・ 極簡純靜態影音工具
     </footer>
@@ -672,6 +791,10 @@
     let ffmpeg = null;
     let isReady = false;
     let isProcessing = false;
+
+    let currentTab = 'splitTab';
+    let currentSubMode = 'cut';
+    let activeAction = 'cut';
 
     function setButtonsDisabled(disabled) {
       document.querySelectorAll('button.btn').forEach(btn => {
@@ -684,8 +807,6 @@
       try { ffmpeg.FS('unlink', fileName); } catch (e) {}
     }
 
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
     const progressBox = document.getElementById('progressBox');
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
@@ -697,35 +818,95 @@
 
     function formatTime(sec) {
       if (isNaN(sec) || sec < 0) return '00:00.0';
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
+      const m = Math.floor(sec / 60);
       const s = Math.floor(sec % 60);
       const ms = Math.floor((sec % 1) * 10);
       const mm = m < 10 ? '0' + m : m;
       const ss = s < 10 ? '0' + s : s;
-      if (h > 0) {
-        const hh = h < 10 ? '0' + h : h;
-        return `${hh}:${mm}:${ss}.${ms}`;
-      }
       return `${mm}:${ss}.${ms}`;
     }
 
+    function formatTimeCmd(sec) {
+      if (isNaN(sec) || sec < 0) return '00:00:00.0';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      const ms = Math.floor((sec % 1) * 10);
+      const hh = h < 10 ? '0' + h : h;
+      const mm = m < 10 ? '0' + m : m;
+      const ss = s < 10 ? '0' + s : s;
+      return `${hh}:${mm}:${ss}.${ms}`;
+    }
+
+    function parseTimeToSec(str) {
+      if (!str) return 0;
+      str = str.trim();
+      const parts = str.split(':');
+      if (parts.length === 3) {
+        return (parseFloat(parts[0]) || 0) * 3600 + (parseFloat(parts[1]) || 0) * 60 + (parseFloat(parts[2]) || 0);
+      } else if (parts.length === 2) {
+        return (parseFloat(parts[0]) || 0) * 60 + (parseFloat(parts[1]) || 0);
+      } else {
+        return parseFloat(str) || 0;
+      }
+    }
+
     function formatBytes(bytes) {
-      if (bytes === 0) return '0 B';
+      if (!bytes || bytes === 0) return '0 B';
       const k = 1024;
       const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
     }
 
+    function getExt(filename) {
+      if (!filename) return '';
+      const idx = filename.lastIndexOf('.');
+      return idx !== -1 ? filename.substring(idx) : '';
+    }
+
+    function getBaseName(filename) {
+      if (!filename) return '';
+      const idx = filename.lastIndexOf('.');
+      return idx !== -1 ? filename.substring(0, idx) : filename;
+    }
+
+    function resolvePaths(filePathVal, fallbackFile, defaultName = '影片.mp4') {
+      let raw = (filePathVal && filePathVal.trim()) ? filePathVal.trim() : '';
+      if (!raw) {
+        if (fallbackFile) {
+          raw = fallbackFile.path || fallbackFile.name;
+        } else {
+          raw = defaultName;
+        }
+      }
+
+      raw = raw.replace(/^["']|["']$/g, '');
+      const ext = getExt(raw) || (fallbackFile ? getExt(fallbackFile.name) : '') || '.mp4';
+      const lastSlash = Math.max(raw.lastIndexOf('/'), raw.lastIndexOf('\\'));
+      let dir = '';
+      let filenameWithExt = raw;
+      if (lastSlash !== -1) {
+        dir = raw.substring(0, lastSlash + 1);
+        filenameWithExt = raw.substring(lastSlash + 1);
+      }
+
+      const base = getBaseName(filenameWithExt);
+      const fullInput = raw;
+      const fullOutputBase = dir ? `${dir}${base}` : base;
+
+      return { fullInput, fullOutputBase, ext, dir, base };
+    }
+
     // 初始化 FFmpeg 核心（採用免 SharedArrayBuffer 的單執行緒核心，全面相容 GitHub Pages）
     async function initFFmpeg() {
+      if (isReady) return;
       const isHttp = window.location.protocol.startsWith('http');
       const candidates = isHttp
         ? [
-            new URL('ffmpeg-core.js', window.location.href).href,
             'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
-            'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
+            'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+            new URL('ffmpeg-core.js', window.location.href).href
           ]
         : [
             'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
@@ -735,9 +916,8 @@
       for (let i = 0; i < candidates.length; i++) {
         const path = candidates[i];
         try {
-          statusText.innerText = '正在載入核心...';
           ffmpeg = createFFmpeg({
-            log: true,
+            log: false,
             corePath: path,
             mainName: 'main'
           });
@@ -752,44 +932,145 @@
 
           await ffmpeg.load();
           isReady = true;
-          statusDot.className = 'status-dot ready';
-          statusText.innerText = '核心就緒';
+          console.log('FFmpeg is ready with:', path);
           return;
         } catch (err) {
           console.warn(`嘗試載入 (${path}) 失敗，嘗試下一組來源...`, err);
         }
       }
+    }
+    setTimeout(initFFmpeg, 300);
 
-      statusDot.className = 'status-dot error';
-      if (window.location.protocol === 'file:') {
-        statusText.innerText = '瀏覽器安全限制：雙擊檔案 (file://) 會被阻擋，請放至 GitHub Pages 或以靜態伺服器開啟。';
+    // 動態產生單行 FFmpeg 指令
+    function updateCommandLine() {
+      const cmdText = document.getElementById('cmdText');
+      if (!cmdText) return;
+
+      const splitInput = document.getElementById('splitFile');
+      const splitFile = splitInput && splitInput.files ? splitInput.files[0] : null;
+
+      const muxVInput = document.getElementById('muxVideoFile');
+      const muxAInput = document.getElementById('muxAudioFile');
+      const muxVFile = muxVInput && muxVInput.files ? muxVInput.files[0] : null;
+      const muxAFile = muxAInput && muxAInput.files ? muxAInput.files[0] : null;
+
+      if (currentTab === 'muxTab') {
+        const vRaw = muxVFile ? (muxVFile.path || muxVFile.name) : '影片.mp4';
+        const aRaw = muxAFile ? (muxAFile.path || muxAFile.name) : '聲音.mp3';
+        const { fullInput: vIn, fullOutputBase: vOut } = resolvePaths(vRaw, muxVFile, '影片.mp4');
+        const { fullInput: aIn } = resolvePaths(aRaw, muxAFile, '聲音.mp3');
+        cmdText.innerText = `ffmpeg -y -i "${vIn}" -i "${aIn}" -c:v copy -c:a copy -shortest "${vOut}_merged.mp4"`.trim();
+        return;
+      }
+
+      // splitTab
+      const rawPath = splitFile ? (splitFile.path || splitFile.name) : '影片.mp4';
+      const { fullInput: vName, fullOutputBase: base, ext } = resolvePaths(rawPath, splitFile, '影片.mp4');
+
+      const s = parseFloat(sliderStart.value) || 0;
+      const e = parseFloat(sliderEnd.value) || 0;
+      const max = parseFloat(sliderEnd.max) || 100;
+      const hasDur = video && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0;
+      const totalDur = hasDur ? video.duration : max;
+
+      let timePart = '';
+      const hasStart = s > 0.05;
+      const hasEnd = e > 0 && e < (totalDur - 0.05);
+
+      if (hasStart && hasEnd) {
+        timePart = `-ss ${formatTimeCmd(s)} -to ${formatTimeCmd(e)} `;
+      } else if (hasStart) {
+        timePart = `-ss ${formatTimeCmd(s)} `;
+      } else if (hasEnd) {
+        timePart = `-to ${formatTimeCmd(e)} `;
+      }
+
+      if (activeAction === 'anim' || currentSubMode === 'anim') {
+        const width = document.getElementById('animWidth').value;
+        const fps = document.getElementById('animFps').value;
+        const format = document.getElementById('animFormat').value;
+        const scale = width === '-1' ? '' : `scale=${width}:-1:flags=lanczos,`;
+        const sPart = hasStart ? `-ss ${formatTimeCmd(s)} ` : '';
+        const toPart = hasEnd ? `-to ${formatTimeCmd(e)} ` : '';
+
+        if (format === 'gif') {
+          cmdText.innerText = `ffmpeg -y ${sPart}${toPart}-i "${vName}" -filter_complex "[0:v]fps=${fps},${scale}split[a][b];[a]palettegen[p];[b][p]paletteuse" "${base}_anim.gif"`.trim();
+        } else {
+          const vfFilter = `fps=${fps},${scale}`.replace(/,$/, '');
+          cmdText.innerText = `ffmpeg -y ${sPart}${toPart}-i "${vName}" -vf "${vfFilter}" -loop 0 "${base}_anim.webp"`.trim();
+        }
+      } else if (activeAction === 'audio') {
+        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -vn -c:a copy "${base}_audio.m4a"`.trim();
+      } else if (activeAction === 'video') {
+        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -an -c:v copy "${base}_mute${ext}"`.trim();
       } else {
-        statusText.innerText = '載入核心失敗，請檢查網路連線。';
+        cmdText.innerText = `ffmpeg -y ${timePart}-i "${vName}" -c copy "${base}_cut${ext}"`.trim();
       }
     }
-    initFFmpeg();
+
+    function copyCommandLine() {
+      const cmdText = document.getElementById('cmdText').innerText.trim();
+      const btn = document.getElementById('btnCopyCmd');
+      const showSuccess = () => {
+        btn.innerText = '已複製';
+        setTimeout(() => { btn.innerText = '複製'; }, 2000);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmdText).then(showSuccess).catch(() => {
+          fallbackCopy(cmdText, showSuccess);
+        });
+      } else {
+        fallbackCopy(cmdText, showSuccess);
+      }
+    }
+
+    function fallbackCopy(text, cb) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        if (cb) cb();
+      } catch (e) {}
+      document.body.removeChild(ta);
+    }
 
     // 主頁籤切換
     function switchMainTab(tabId, btn) {
+      currentTab = tabId;
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       btn.classList.add('active');
+      if (tabId === 'muxTab') {
+        activeAction = 'mux';
+      } else {
+        activeAction = currentSubMode === 'anim' ? 'anim' : 'cut';
+      }
       hideResult();
+      updateCommandLine();
     }
 
     // 子功能切換 (剪切/抽取 vs 轉動畫)
     function switchSubMode(mode, btn) {
+      currentSubMode = mode;
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       if (mode === 'cut') {
         document.getElementById('cutActions').style.display = 'block';
         document.getElementById('animActions').style.display = 'none';
+        activeAction = 'cut';
       } else {
         document.getElementById('cutActions').style.display = 'none';
         document.getElementById('animActions').style.display = 'block';
+        activeAction = 'anim';
       }
       hideResult();
+      updateCommandLine();
     }
 
     // 時間軸控制器
@@ -797,8 +1078,8 @@
     const sliderStart = document.getElementById('splitSliderStart');
     const sliderEnd = document.getElementById('splitSliderEnd');
     const trackHighlight = document.getElementById('splitTrackHighlight');
-    const textStart = document.getElementById('splitStartText');
-    const textEnd = document.getElementById('splitEndText');
+    const startInput = document.getElementById('splitStartInput');
+    const endInput = document.getElementById('splitEndInput');
     const textDuration = document.getElementById('splitDurationText');
 
     function updateHighlight() {
@@ -811,9 +1092,10 @@
       trackHighlight.style.left = `${leftPercent}%`;
       trackHighlight.style.width = `${widthPercent}%`;
 
-      textStart.innerText = formatTime(s);
-      textEnd.innerText = formatTime(e);
+      if (startInput) startInput.value = formatTime(s);
+      if (endInput) endInput.value = formatTime(e);
       textDuration.innerText = `選取長度: ${(e - s).toFixed(1)} 秒`;
+      updateCommandLine();
     }
 
     sliderStart.addEventListener('input', () => {
@@ -823,7 +1105,9 @@
         s = e;
         sliderStart.value = s;
       }
-      video.currentTime = s;
+      if (video && !isNaN(video.duration)) {
+        video.currentTime = s;
+      }
       updateHighlight();
     });
 
@@ -834,12 +1118,44 @@
         e = s;
         sliderEnd.value = e;
       }
-      video.currentTime = e;
+      if (video && !isNaN(video.duration)) {
+        video.currentTime = e;
+      }
       updateHighlight();
     });
 
+    if (startInput) {
+      startInput.addEventListener('change', () => {
+        let sec = parseTimeToSec(startInput.value);
+        if (sec > parseFloat(sliderStart.max)) {
+          sliderStart.max = sec;
+          sliderEnd.max = Math.max(sec, parseFloat(sliderEnd.max));
+        }
+        let e = parseFloat(sliderEnd.value);
+        if (sec > e) sec = e;
+        sliderStart.value = sec;
+        if (video && !isNaN(video.duration)) video.currentTime = sec;
+        updateHighlight();
+      });
+    }
+
+    if (endInput) {
+      endInput.addEventListener('change', () => {
+        let sec = parseTimeToSec(endInput.value);
+        if (sec > parseFloat(sliderEnd.max)) {
+          sliderEnd.max = sec;
+          sliderStart.max = sec;
+        }
+        let s = parseFloat(sliderStart.value);
+        if (sec < s) sec = s;
+        sliderEnd.value = sec;
+        if (video && !isNaN(video.duration)) video.currentTime = sec;
+        updateHighlight();
+      });
+    }
+
     video.addEventListener('loadedmetadata', () => {
-      const dur = video.duration || 10;
+      const dur = video.duration && !isNaN(video.duration) ? video.duration : 100;
       sliderStart.max = dur;
       sliderEnd.max = dur;
       sliderStart.value = 0;
@@ -848,7 +1164,7 @@
     });
 
     function setMarker(type) {
-      const cur = video.currentTime;
+      const cur = (video && !isNaN(video.currentTime)) ? video.currentTime : 0;
       if (type === 'start') {
         const e = parseFloat(sliderEnd.value);
         sliderStart.value = Math.min(cur, e);
@@ -862,15 +1178,47 @@
     function previewSegment() {
       const s = parseFloat(sliderStart.value);
       const e = parseFloat(sliderEnd.value);
-      video.currentTime = s;
-      video.play();
-      const onTime = () => {
-        if (video.currentTime >= e) {
-          video.pause();
-          video.removeEventListener('timeupdate', onTime);
-        }
-      };
-      video.addEventListener('timeupdate', onTime);
+      if (video && !isNaN(video.duration)) {
+        video.currentTime = s;
+        video.play();
+        const onTime = () => {
+          if (video.currentTime >= e) {
+            video.pause();
+            video.removeEventListener('timeupdate', onTime);
+          }
+        };
+        video.addEventListener('timeupdate', onTime);
+      }
+    }
+
+    function resetSplitVideo() {
+      const input = document.getElementById('splitFile');
+      if (input) input.value = '';
+      const label = document.getElementById('splitFileName');
+      if (label) label.innerText = '';
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
+      const dropGroup = document.getElementById('splitDropGroup');
+      if (dropGroup) dropGroup.style.display = 'block';
+      const timelineBox = document.getElementById('splitTimelineBox');
+      if (timelineBox) timelineBox.style.display = 'none';
+
+      sliderStart.value = 0;
+      sliderEnd.value = 100;
+      sliderStart.max = 100;
+      sliderEnd.max = 100;
+      trackHighlight.style.left = '0%';
+      trackHighlight.style.width = '100%';
+      if (startInput) startInput.value = '00:00.0';
+      if (endInput) endInput.value = '00:00.0';
+      textDuration.innerText = '選取長度: 0.0 秒';
+
+      hideResult();
+      hideProgress();
+      updateCommandLine();
     }
 
     // 檔案拖放綁定
@@ -885,9 +1233,13 @@
           label.innerText = `${file.name} (${formatBytes(file.size)})`;
 
           if (isVideo) {
+            const dropGroup = document.getElementById('splitDropGroup');
+            if (dropGroup) dropGroup.style.display = 'none';
             document.getElementById('splitTimelineBox').style.display = 'block';
             video.src = URL.createObjectURL(file);
           }
+          hideResult();
+          updateCommandLine();
         }
       });
 
@@ -898,11 +1250,20 @@
         });
       });
 
-      ['dragleave', 'drop'].forEach(name => {
+      ['dragleave'].forEach(name => {
         dropzone.addEventListener(name, (e) => {
           e.preventDefault();
           dropzone.classList.remove('dragover');
         });
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          input.files = e.dataTransfer.files;
+          input.dispatchEvent(new Event('change'));
+        }
       });
     }
 
@@ -915,15 +1276,11 @@
       progressBar.style.width = '0%';
       progressPercent.innerText = '0%';
       progressMessage.innerText = msg;
-      statusDot.className = 'status-dot busy';
-      statusText.innerText = '處理中...';
       hideResult();
     }
 
     function hideProgress() {
       progressBox.style.display = 'none';
-      statusDot.className = 'status-dot ready';
-      statusText.innerText = '核心就緒';
     }
 
     function showResult(blob, fileName, isMedia = 'video') {
@@ -959,32 +1316,44 @@
       previewContainer.innerHTML = '';
     }
 
-    function getExt(filename) {
-      const idx = filename.lastIndexOf('.');
-      return idx !== -1 ? filename.substring(idx) : '';
-    }
-
-    function getBaseName(filename) {
-      const idx = filename.lastIndexOf('.');
-      return idx !== -1 ? filename.substring(0, idx) : filename;
-    }
-
     // 1-A. 分割 / 拆軌
     async function handleSplit(mode) {
-      if (!isReady) return alert('核心尚未準備完成，請稍候。');
-      if (isProcessing) return;
+      activeAction = mode === 'both' ? 'cut' : mode;
+      updateCommandLine();
 
       const fileInput = document.getElementById('splitFile');
-      if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
+      if (!fileInput.files || !fileInput.files[0]) { copyCommandLine(); return; }
 
       const file = fileInput.files[0];
+      const limitBytes = 900 * 1024 * 1024;
+
+      if (file.size >= limitBytes) {
+        copyCommandLine();
+        return;
+      }
+
+      if (!isReady) {
+        showProgress('正在準備轉檔核心，請稍候...');
+        await initFFmpeg();
+        if (!isReady) {
+          hideProgress();
+          copyCommandLine();
+          return;
+        }
+      }
+      if (isProcessing) return;
+
       const ext = getExt(file.name) || '.mp4';
       const baseName = getBaseName(file.name);
       const inputName = `input${ext}`;
 
       const s = parseFloat(sliderStart.value) || 0;
       const e = parseFloat(sliderEnd.value) || 0;
-      const hasTimeRange = video && video.duration && (s > 0.05 || e < video.duration - 0.05);
+      const max = parseFloat(sliderEnd.max) || 100;
+      const hasDur = video && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0;
+      const totalDur = hasDur ? video.duration : max;
+      const hasStart = s > 0.05;
+      const hasEnd = e > 0 && e < (totalDur - 0.05);
 
       isProcessing = true;
       setButtonsDisabled(true);
@@ -1011,9 +1380,8 @@
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
         let args = ['-y'];
-        if (hasTimeRange) {
-          args.push('-ss', s.toString(), '-to', e.toString());
-        }
+        if (hasStart) args.push('-ss', formatTimeCmd(s));
+        if (hasEnd) args.push('-to', formatTimeCmd(e));
         args.push('-i', inputName);
 
         if (mode === 'audio') {
@@ -1036,7 +1404,8 @@
         showResult(blob, outName, mediaType);
       } catch (err) {
         console.error(err);
-        alert('處理失敗：' + (err.message || err));
+        copyCommandLine();
+        copyCommandLine();
         hideProgress();
         if (err.message && err.message.includes('can only run one command')) {
           initFFmpeg();
@@ -1051,19 +1420,43 @@
 
     // 1-B. 轉為動畫 (共用選取的影片與時間軸)
     async function handleMakeAnimation() {
-      if (!isReady) return alert('核心尚未準備完成，請稍候。');
-      if (isProcessing) return;
+      activeAction = 'anim';
+      updateCommandLine();
 
       const fileInput = document.getElementById('splitFile');
-      if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
+      if (!fileInput.files || !fileInput.files[0]) { copyCommandLine(); return; }
 
       const file = fileInput.files[0];
+      const limitBytes = 900 * 1024 * 1024;
+
+      if (file.size >= limitBytes) {
+        copyCommandLine();
+        return;
+      }
+
+      if (!isReady) {
+        showProgress('正在準備轉檔核心，請稍候...');
+        await initFFmpeg();
+        if (!isReady) {
+          hideProgress();
+          copyCommandLine();
+          return;
+        }
+      }
+      if (isProcessing) return;
+
       const ext = getExt(file.name) || '.mp4';
       const baseName = getBaseName(file.name);
       const inputName = `input_anim${ext}`;
 
       const s = parseFloat(sliderStart.value) || 0;
       const e = parseFloat(sliderEnd.value) || 0;
+      const max = parseFloat(sliderEnd.max) || 100;
+      const hasDur = video && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0;
+      const totalDur = hasDur ? video.duration : max;
+      const hasStart = s > 0.05;
+      const hasEnd = e > 0 && e < (totalDur - 0.05);
+
       const width = document.getElementById('animWidth').value;
       const fps = document.getElementById('animFps').value;
       const format = document.getElementById('animFormat').value;
@@ -1080,8 +1473,8 @@
         ffmpeg.FS('writeFile', inputName, await fetchFile(file));
 
         let args = ['-y'];
-        if (s > 0) args.push('-ss', s.toString());
-        if (e > s) args.push('-to', e.toString());
+        if (hasStart) args.push('-ss', formatTimeCmd(s));
+        if (hasEnd) args.push('-to', formatTimeCmd(e));
         args.push('-i', inputName);
 
         const scaleFilter = width === '-1' ? '' : `scale=${width}:-1:flags=lanczos,`;
@@ -1105,7 +1498,8 @@
         showResult(blob, outName, 'image');
       } catch (err) {
         console.error(err);
-        alert('轉換動畫失敗：' + (err.message || err));
+        copyCommandLine();
+        copyCommandLine();
         hideProgress();
         if (err.message && err.message.includes('can only run one command')) {
           initFFmpeg();
@@ -1120,17 +1514,34 @@
 
     // 2. 合併影音
     async function handleMux() {
-      if (!isReady) return alert('核心尚未準備完成，請稍候。');
-      if (isProcessing) return;
+      activeAction = 'mux';
+      updateCommandLine();
 
       const vInput = document.getElementById('muxVideoFile');
       const aInput = document.getElementById('muxAudioFile');
 
-      if (!vInput.files || !vInput.files[0]) return alert('請選取影片檔案。');
-      if (!aInput.files || !aInput.files[0]) return alert('請選取聲音檔案。');
+      if (!vInput.files || !vInput.files[0]) { copyCommandLine(); return; }
+      if (!aInput.files || !aInput.files[0]) { copyCommandLine(); return; }
 
       const vFile = vInput.files[0];
       const aFile = aInput.files[0];
+      const limitBytes = 900 * 1024 * 1024;
+
+      if (vFile.size >= limitBytes || aFile.size >= limitBytes) {
+        copyCommandLine();
+        return;
+      }
+
+      if (!isReady) {
+        showProgress('正在準備轉檔核心，請稍候...');
+        await initFFmpeg();
+        if (!isReady) {
+          hideProgress();
+          copyCommandLine();
+          return;
+        }
+      }
+      if (isProcessing) return;
 
       const vExt = getExt(vFile.name) || '.mp4';
       const aExt = getExt(aFile.name) || '.mp3';
@@ -1172,7 +1583,8 @@
         showResult(blob, outName, 'video');
       } catch (err) {
         console.error(err);
-        alert('合併失敗：' + (err.message || err));
+        copyCommandLine();
+        copyCommandLine();
         hideProgress();
         if (err.message && err.message.includes('can only run one command')) {
           initFFmpeg();
@@ -1185,6 +1597,13 @@
         setButtonsDisabled(false);
       }
     }
+
+    ['animWidth', 'animFps', 'animFormat'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', updateCommandLine);
+    });
+
+    updateCommandLine();
   </script>
 </body>
 </html>
