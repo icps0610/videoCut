@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoCut - 極簡影音工具</title>
+  <!-- FFmpeg.wasm 核心檔案（優先載入本地，備用 jsdelivr CDN） -->
+  <script src="./ffmpeg.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js'"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --danger: #ef4444;
+      --input-bg: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 760px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1.75rem;
+    }
+
+    header h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.35rem;
+    }
+
+    header p {
+      color: var(--text-sub);
+      font-size: 0.95rem;
+    }
+
+    /* Core Status */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      margin-top: 0.6rem;
+      background-color: #1e293b;
+      border: 1px solid var(--card-border);
+      color: var(--text-sub);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #eab308;
+    }
+    .status-dot.ready { background-color: var(--accent); }
+    .status-dot.busy { background-color: var(--primary); animation: pulse 1.2s infinite; }
+    .status-dot.error { background-color: var(--danger); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--card-bg);
+      padding: 0.35rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--card-border);
+      margin-bottom: 1.5rem;
+      gap: 0.35rem;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.65rem 0.5rem;
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      font-size: 0.9rem;
+      font-weight: 500;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    }
+
+    /* Card Panels */
+    .panel {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1rem;
+      padding: 1.75rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    .panel.active {
+      display: block;
+    }
+
+    /* Form & Dropzones */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      margin-bottom: 0.4rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--card-border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      background: var(--input-bg);
+      transition: border-color 0.2s, background-color 0.2s;
+      position: relative;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+    .dropzone input[type="file"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .dropzone .file-name {
+      font-size: 0.95rem;
+      color: var(--text-main);
+      font-weight: 500;
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+    .dropzone .hint {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+    }
+
+    /* Timeline & Video Preview */
+    .timeline-container {
+      margin-top: 1.25rem;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+
+    .video-preview-box {
+      width: 100%;
+      max-height: 290px;
+      background: #000;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 0.85rem;
+    }
+
+    .video-preview-box video {
+      width: 100%;
+      max-height: 290px;
+      object-fit: contain;
+    }
+
+    .timeline-bar-wrapper {
+      position: relative;
+      width: 100%;
+      height: 30px;
+      margin: 0.75rem 0 0.5rem 0;
+    }
+
+    .timeline-track-bg {
+      position: absolute;
+      top: 11px;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+    }
+
+    .timeline-track-selected {
+      position: absolute;
+      top: 11px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .timeline-bar-wrapper input[type="range"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 30px;
+      margin: 0;
+      background: none;
+      pointer-events: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .timeline-bar-wrapper input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      pointer-events: auto;
+      width: 16px;
+      height: 26px;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      border-radius: 4px;
+      cursor: ew-resize;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      transition: transform 0.1s, background-color 0.1s;
+    }
+    .timeline-bar-wrapper input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background-color: #dbeafe;
+    }
+    .timeline-bar-wrapper input[type="range"]::-moz-range-thumb {
+      pointer-events: auto;
+      width: 16px;
+      height: 26px;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      border-radius: 4px;
+      cursor: ew-resize;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .timeline-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      margin-top: 0.25rem;
+    }
+
+    .time-badge {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .timeline-actions {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-micro {
+      padding: 0.3rem 0.6rem;
+      background: #334155;
+      border: none;
+      border-radius: 0.35rem;
+      color: var(--text-main);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-micro:hover {
+      background: #475569;
+    }
+
+    .duration-indicator {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      text-align: center;
+      margin-top: 0.4rem;
+    }
+
+    /* Grid & Inputs */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 0.5rem;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      outline: none;
+    }
+    select:focus, input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    /* Action Buttons */
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    button.btn {
+      flex: 1;
+      min-width: 130px;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.925rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    button.btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    button.btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    button.btn-secondary {
+      background: #334155;
+      color: white;
+    }
+    button.btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    button.btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+    button.btn-accent:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button.btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Logs & Progress */
+    .progress-box {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      display: none;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-sub);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.2s ease;
+    }
+
+    /* Result Area */
+    .result-box {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 0.75rem;
+      display: none;
+      text-align: center;
+    }
+
+    .result-box a.download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      margin-top: 0.75rem;
+      transition: background 0.2s;
+    }
+    .result-box a.download-link:hover {
+      background: var(--accent-hover);
+    }
+
+    .preview-container {
+      margin-top: 1rem;
+      max-width: 100%;
+    }
+    .preview-container img, .preview-container video {
+      max-width: 100%;
+      max-height: 320px;
+      border-radius: 0.5rem;
+      border: 1px solid var(--card-border);
+    }
+
+    footer {
+      margin-top: auto;
+      padding-top: 2rem;
+      color: var(--text-sub);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>🎬 VideoCut</h1>
+      <p>極簡影音分割・合併・動畫轉換・本機處理</p>
+      <div class="status-badge">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">正在初始化核心...</span>
+      </div>
+    </header>
+
+    <!-- 功能頁籤 -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('splitTab', this)">1. 分割 / 拆軌</button>
+      <button class="tab-btn" onclick="switchTab('muxTab', this)">2. 合併影音</button>
+      <button class="tab-btn" onclick="switchTab('gifTab', this)">3. 轉動畫</button>
+    </div>
+
+    <!-- 頁面 1: 分割 / 拆軌 -->
+    <div id="splitTab" class="panel active">
+      <div class="form-group">
+        <label>選取影片</label>
+        <div class="dropzone" id="splitDropzone">
+          <input type="file" id="splitFile" accept="video/*,.mkv,.mp4,.mov,.webm,.avi">
+          <div class="hint">點擊選取或拖曳影片至此</div>
+          <div class="file-name" id="splitFileName"></div>
+        </div>
+      </div>
+
+      <!-- 影片時間軸預覽 -->
+      <div class="timeline-container" id="splitTimelineBox" style="display: none;">
+        <label>時間軸預覽與選取範圍</label>
+        <div class="video-preview-box">
+          <video id="splitVideo" controls playsinline></video>
+        </div>
+
+        <div class="timeline-bar-wrapper">
+          <div class="timeline-track-bg"></div>
+          <div class="timeline-track-selected" id="splitTrackHighlight"></div>
+          <input type="range" id="splitSliderStart" min="0" max="100" step="0.05" value="0">
+          <input type="range" id="splitSliderEnd" min="0" max="100" step="0.05" value="100">
+        </div>
+
+        <div class="timeline-details">
+          <div>起點: <span class="time-badge" id="splitStartText">00:00.0</span></div>
+          <div class="timeline-actions">
+            <button type="button" class="btn-micro" onclick="setMarker('split', 'start')">設為起點</button>
+            <button type="button" class="btn-micro" onclick="previewSegment('split')">預覽區間</button>
+            <button type="button" class="btn-micro" onclick="setMarker('split', 'end')">設為終點</button>
+          </div>
+          <div>終點: <span class="time-badge" id="splitEndText">00:00.0</span></div>
+        </div>
+        <div class="duration-indicator" id="splitDurationText">選取長度: 0.0 秒</div>
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-secondary" onclick="handleSplit('audio')">
+          🎵 抽取聲音
+        </button>
+        <button class="btn btn-secondary" onclick="handleSplit('video')">
+          🔇 抽取畫面
+        </button>
+        <button class="btn btn-primary" onclick="handleSplit('both')">
+          ✂️ 剪切片段
+        </button>
+      </div>
+    </div>
+
+    <!-- 頁面 2: 合併影音 -->
+    <div id="muxTab" class="panel">
+      <div class="form-group">
+        <label>1. 選取影片 (畫面來源)</label>
+        <div class="dropzone" id="muxVideoDropzone">
+          <input type="file" id="muxVideoFile" accept="video/*,.mkv,.mp4,.mov,.webm">
+          <div class="hint">點擊或拖入影片檔</div>
+          <div class="file-name" id="muxVideoFileName"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>2. 選取聲音 (音訊來源)</label>
+        <div class="dropzone" id="muxAudioDropzone">
+          <input type="file" id="muxAudioFile" accept="audio/*,.mp3,.aac,.m4a,.wav,.ogg,.flac">
+          <div class="hint">點擊或拖入聲音檔</div>
+          <div class="file-name" id="muxAudioFileName"></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-primary" onclick="handleMux()">
+          🔗 合併影音
+        </button>
+      </div>
+    </div>
+
+    <!-- 頁面 3: 轉動畫 -->
+    <div id="gifTab" class="panel">
+      <div class="form-group">
+        <label>選取影片</label>
+        <div class="dropzone" id="gifDropzone">
+          <input type="file" id="gifFile" accept="video/*,.mkv,.mp4,.mov,.webm">
+          <div class="hint">點擊或拖入影片檔</div>
+          <div class="file-name" id="gifFileName"></div>
+        </div>
+      </div>
+
+      <!-- 動畫時間軸預覽 -->
+      <div class="timeline-container" id="gifTimelineBox" style="display: none;">
+        <label>動畫時間軸預覽</label>
+        <div class="video-preview-box">
+          <video id="gifVideo" controls playsinline></video>
+        </div>
+
+        <div class="timeline-bar-wrapper">
+          <div class="timeline-track-bg"></div>
+          <div class="timeline-track-selected" id="gifTrackHighlight"></div>
+          <input type="range" id="gifSliderStart" min="0" max="100" step="0.05" value="0">
+          <input type="range" id="gifSliderEnd" min="0" max="100" step="0.05" value="5">
+        </div>
+
+        <div class="timeline-details">
+          <div>起點: <span class="time-badge" id="gifStartText">00:00.0</span></div>
+          <div class="timeline-actions">
+            <button type="button" class="btn-micro" onclick="setMarker('gif', 'start')">設為起點</button>
+            <button type="button" class="btn-micro" onclick="previewSegment('gif')">預覽區間</button>
+            <button type="button" class="btn-micro" onclick="setMarker('gif', 'end')">設為終點</button>
+          </div>
+          <div>終點: <span class="time-badge" id="gifEndText">00:00.0</span></div>
+        </div>
+        <div class="duration-indicator" id="gifDurationText">動畫長度: 0.0 秒</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>動畫寬度</label>
+          <select id="gifWidth">
+            <option value="320">320 px (輕量)</option>
+            <option value="480" selected>480 px (建議預設)</option>
+            <option value="640">640 px (高畫質)</option>
+            <option value="-1">原尺寸</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>影格率 (FPS)</label>
+          <select id="gifFps">
+            <option value="10">10 FPS (小檔案)</option>
+            <option value="15" selected>15 FPS (順暢)</option>
+            <option value="24">24 FPS (高流暢)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>輸出格式</label>
+        <select id="gifFormat">
+          <option value="gif" selected>GIF 動畫 (最佳相容性，高階調色盤防雜點)</option>
+          <option value="webp">WebP 動畫 (高畫質、檔案更小)</option>
+        </select>
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-accent" onclick="handleMakeAnimation()">
+          ✨ 轉為動畫
+        </button>
+      </div>
+    </div>
+
+    <!-- 進度與處理狀態 -->
+    <div class="progress-box" id="progressBox">
+      <div class="progress-header">
+        <span id="progressMessage">處理中...</span>
+        <span id="progressPercent">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+
+    <!-- 輸出與下載成果 -->
+    <div class="result-box" id="resultBox">
+      <div style="font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">
+        ✅ 完成！
+      </div>
+      <div class="preview-container" id="previewContainer"></div>
+      <a href="#" class="download-link" id="downloadBtn" download="output">
+        💾 下載檔案 (<span id="resultFileSize">0 MB</span>)
+      </a>
+    </div>
+
+    <footer>
+      VideoCut ・ 極簡純靜態影音工具
+    </footer>
+  </div>
+
+  <script>
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    let ffmpeg = null;
+    let isReady = false;
+
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const progressBox = document.getElementById('progressBox');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressMessage = document.getElementById('progressMessage');
+    const resultBox = document.getElementById('resultBox');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const previewContainer = document.getElementById('previewContainer');
+    const resultFileSize = document.getElementById('resultFileSize');
+
+    // 格式化秒數為 mm:ss.s 或 hh:mm:ss.s
+    function formatTime(sec) {
+      if (isNaN(sec) || sec < 0) return '00:00.0';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      const ms = Math.floor((sec % 1) * 10);
+      const mm = m < 10 ? '0' + m : m;
+      const ss = s < 10 ? '0' + s : s;
+      if (h > 0) {
+        const hh = h < 10 ? '0' + h : h;
+        return `${hh}:${mm}:${ss}.${ms}`;
+      }
+      return `${mm}:${ss}.${ms}`;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+    }
+
+    // 初始化 FFmpeg（具備本地核心 + 多組 CDN 自動容錯備援）
+    async function initFFmpeg() {
+      const isHttp = window.location.protocol.startsWith('http');
+      const candidates = isHttp
+        ? [
+            new URL('ffmpeg-core.js', window.location.href).href,
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+            'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+          ]
+        : [
+            'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+            'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+          ];
+
+      for (let i = 0; i < candidates.length; i++) {
+        const path = candidates[i];
+        try {
+          statusText.innerText = '正在載入核心...';
+          ffmpeg = createFFmpeg({
+            log: true,
+            corePath: path
+          });
+
+          ffmpeg.setProgress(({ ratio }) => {
+            if (ratio >= 0 && ratio <= 1) {
+              const p = Math.round(ratio * 100);
+              progressBar.style.width = `${p}%`;
+              progressPercent.innerText = `${p}%`;
+            }
+          });
+
+          await ffmpeg.load();
+          isReady = true;
+          statusDot.className = 'status-dot ready';
+          statusText.innerText = '核心就緒';
+          return;
+        } catch (err) {
+          console.warn(`嘗試載入核心 (${path}) 失敗，切換下一組來源...`, err);
+        }
+      }
+
+      // 若所有來源皆被瀏覽器阻擋
+      statusDot.className = 'status-dot error';
+      if (window.location.protocol === 'file:') {
+        statusText.innerText = '瀏覽器安全限制：雙擊檔案 (file://) 會被阻擋，請放至 GitHub Pages 或以靜態伺服器開啟。';
+      } else {
+        statusText.innerText = '載入核心失敗，請檢查網路連線。';
+      }
+    }
+    initFFmpeg();
+
+    // 頁籤切換
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+      hideResult();
+    }
+
+    // 時間軸控制器初始化 (支援分割與轉動畫)
+    function setupTimeline(prefix) {
+      const video = document.getElementById(`${prefix}Video`);
+      const sliderStart = document.getElementById(`${prefix}SliderStart`);
+      const sliderEnd = document.getElementById(`${prefix}SliderEnd`);
+      const trackHighlight = document.getElementById(`${prefix}TrackHighlight`);
+      const textStart = document.getElementById(`${prefix}StartText`);
+      const textEnd = document.getElementById(`${prefix}EndText`);
+      const textDuration = document.getElementById(`${prefix}DurationText`);
+
+      function updateHighlight() {
+        const max = parseFloat(sliderStart.max) || 100;
+        const s = parseFloat(sliderStart.value) || 0;
+        const e = parseFloat(sliderEnd.value) || 0;
+        const leftPercent = (s / max) * 100;
+        const widthPercent = ((e - s) / max) * 100;
+
+        trackHighlight.style.left = `${leftPercent}%`;
+        trackHighlight.style.width = `${widthPercent}%`;
+
+        textStart.innerText = formatTime(s);
+        textEnd.innerText = formatTime(e);
+        const len = (e - s).toFixed(1);
+        textDuration.innerText = prefix === 'gif' ? `動畫長度: ${len} 秒` : `選取長度: ${len} 秒`;
+      }
+
+      sliderStart.addEventListener('input', () => {
+        let s = parseFloat(sliderStart.value);
+        let e = parseFloat(sliderEnd.value);
+        if (s > e) {
+          s = e;
+          sliderStart.value = s;
+        }
+        video.currentTime = s;
+        updateHighlight();
+      });
+
+      sliderEnd.addEventListener('input', () => {
+        let s = parseFloat(sliderStart.value);
+        let e = parseFloat(sliderEnd.value);
+        if (e < s) {
+          e = s;
+          sliderEnd.value = e;
+        }
+        video.currentTime = e;
+        updateHighlight();
+      });
+
+      video.addEventListener('loadedmetadata', () => {
+        const dur = video.duration || 10;
+        sliderStart.max = dur;
+        sliderEnd.max = dur;
+        sliderStart.value = 0;
+        // 若為動畫預設先取前 5 秒或整段
+        if (prefix === 'gif') {
+          sliderEnd.value = Math.min(5, dur);
+        } else {
+          sliderEnd.value = dur;
+        }
+        updateHighlight();
+      });
+
+      return { updateHighlight };
+    }
+
+    const splitTimeline = setupTimeline('split');
+    const gifTimeline = setupTimeline('gif');
+
+    // 設定起點/終點快速鍵
+    function setMarker(prefix, type) {
+      const video = document.getElementById(`${prefix}Video`);
+      const sliderStart = document.getElementById(`${prefix}SliderStart`);
+      const sliderEnd = document.getElementById(`${prefix}SliderEnd`);
+      const cur = video.currentTime;
+
+      if (type === 'start') {
+        const e = parseFloat(sliderEnd.value);
+        sliderStart.value = Math.min(cur, e);
+      } else {
+        const s = parseFloat(sliderStart.value);
+        sliderEnd.value = Math.max(cur, s);
+      }
+      if (prefix === 'split') splitTimeline.updateHighlight();
+      if (prefix === 'gif') gifTimeline.updateHighlight();
+    }
+
+    // 播放所選區間
+    function previewSegment(prefix) {
+      const video = document.getElementById(`${prefix}Video`);
+      const sliderStart = document.getElementById(`${prefix}SliderStart`);
+      const sliderEnd = document.getElementById(`${prefix}SliderEnd`);
+      const s = parseFloat(sliderStart.value);
+      const e = parseFloat(sliderEnd.value);
+
+      video.currentTime = s;
+      video.play();
+
+      const onTime = () => {
+        if (video.currentTime >= e) {
+          video.pause();
+          video.removeEventListener('timeupdate', onTime);
+        }
+      };
+      video.addEventListener('timeupdate', onTime);
+    }
+
+    // 綁定檔案上傳與預覽
+    function setupDropzone(dropId, inputId, labelId, previewPrefix) {
+      const dropzone = document.getElementById(dropId);
+      const input = document.getElementById(inputId);
+      const label = document.getElementById(labelId);
+
+      input.addEventListener('change', () => {
+        if (input.files && input.files[0]) {
+          const file = input.files[0];
+          label.innerText = `${file.name} (${formatBytes(file.size)})`;
+
+          if (previewPrefix) {
+            const previewBox = document.getElementById(`${previewPrefix}TimelineBox`);
+            const video = document.getElementById(`${previewPrefix}Video`);
+            previewBox.style.display = 'block';
+            video.src = URL.createObjectURL(file);
+          }
+        }
+      });
+
+      ['dragenter', 'dragover'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+        });
+      });
+    }
+
+    setupDropzone('splitDropzone', 'splitFile', 'splitFileName', 'split');
+    setupDropzone('muxVideoDropzone', 'muxVideoFile', 'muxVideoFileName');
+    setupDropzone('muxAudioDropzone', 'muxAudioFile', 'muxAudioFileName');
+    setupDropzone('gifDropzone', 'gifFile', 'gifFileName', 'gif');
+
+    function showProgress(msg) {
+      progressBox.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressPercent.innerText = '0%';
+      progressMessage.innerText = msg;
+      statusDot.className = 'status-dot busy';
+      statusText.innerText = '處理中...';
+      hideResult();
+    }
+
+    function hideProgress() {
+      progressBox.style.display = 'none';
+      statusDot.className = 'status-dot ready';
+      statusText.innerText = '核心就緒';
+    }
+
+    function showResult(blob, fileName, isMedia = 'video') {
+      hideProgress();
+      const url = URL.createObjectURL(blob);
+      downloadBtn.href = url;
+      downloadBtn.download = fileName;
+      resultFileSize.innerText = formatBytes(blob.size);
+
+      previewContainer.innerHTML = '';
+      if (isMedia === 'image') {
+        const img = document.createElement('img');
+        img.src = url;
+        previewContainer.appendChild(img);
+      } else if (isMedia === 'video') {
+        const vid = document.createElement('video');
+        vid.src = url;
+        vid.controls = true;
+        previewContainer.appendChild(vid);
+      } else if (isMedia === 'audio') {
+        const aud = document.createElement('audio');
+        aud.src = url;
+        aud.controls = true;
+        previewContainer.appendChild(aud);
+      }
+
+      resultBox.style.display = 'block';
+      resultBox.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideResult() {
+      resultBox.style.display = 'none';
+      previewContainer.innerHTML = '';
+    }
+
+    function getExt(filename) {
+      const idx = filename.lastIndexOf('.');
+      return idx !== -1 ? filename.substring(idx) : '';
+    }
+
+    function getBaseName(filename) {
+      const idx = filename.lastIndexOf('.');
+      return idx !== -1 ? filename.substring(0, idx) : filename;
+    }
+
+    // 1. 分割 / 拆軌
+    async function handleSplit(mode) {
+      if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      const fileInput = document.getElementById('splitFile');
+      if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
+
+      const file = fileInput.files[0];
+      const ext = getExt(file.name) || '.mp4';
+      const baseName = getBaseName(file.name);
+      const inputName = `input${ext}`;
+
+      const s = parseFloat(document.getElementById('splitSliderStart').value) || 0;
+      const e = parseFloat(document.getElementById('splitSliderEnd').value) || 0;
+      const video = document.getElementById('splitVideo');
+      const hasTimeRange = video && video.duration && (s > 0.05 || e < video.duration - 0.05);
+
+      showProgress('載入影片資料中...');
+
+      try {
+        ffmpeg.FS('writeFile', inputName, await fetchFile(file));
+
+        let args = [];
+        if (hasTimeRange) {
+          args.push('-ss', s.toString(), '-to', e.toString());
+        }
+        args.push('-i', inputName);
+
+        let outName = '';
+        let mediaType = 'video';
+
+        if (mode === 'audio') {
+          outName = `${baseName}_audio.m4a`;
+          args.push('-vn', '-c:a', 'copy', outName);
+          mediaType = 'audio';
+          progressMessage.innerText = '正在抽取聲音...';
+        } else if (mode === 'video') {
+          outName = `${baseName}_mute${ext}`;
+          args.push('-an', '-c:v', 'copy', outName);
+          mediaType = 'video';
+          progressMessage.innerText = '正在抽取畫面...';
+        } else {
+          outName = `${baseName}_cut${ext}`;
+          args.push('-c', 'copy', outName);
+          mediaType = 'video';
+          progressMessage.innerText = '正在剪切片段...';
+        }
+
+        await ffmpeg.run(...args);
+
+        const data = ffmpeg.FS('readFile', outName);
+        const mime = mode === 'audio' ? 'audio/mp4' : (ext === '.webm' ? 'video/webm' : 'video/mp4');
+        const blob = new Blob([data.buffer], { type: mime });
+
+        showResult(blob, outName, mediaType);
+
+        ffmpeg.FS('unlink', inputName);
+        ffmpeg.FS('unlink', outName);
+      } catch (err) {
+        console.error(err);
+        alert('處理失敗：' + (err.message || err));
+        hideProgress();
+      }
+    }
+
+    // 2. 合併影音
+    async function handleMux() {
+      if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      const vInput = document.getElementById('muxVideoFile');
+      const aInput = document.getElementById('muxAudioFile');
+
+      if (!vInput.files || !vInput.files[0]) return alert('請選取影片檔案。');
+      if (!aInput.files || !aInput.files[0]) return alert('請選取聲音檔案。');
+
+      const vFile = vInput.files[0];
+      const aFile = aInput.files[0];
+
+      const vExt = getExt(vFile.name) || '.mp4';
+      const aExt = getExt(aFile.name) || '.mp3';
+      const baseName = getBaseName(vFile.name);
+
+      const inVideoName = `in_v${vExt}`;
+      const inAudioName = `in_a${aExt}`;
+      const outName = `${baseName}_merged.mp4`;
+
+      showProgress('載入影音資料中...');
+
+      try {
+        ffmpeg.FS('writeFile', inVideoName, await fetchFile(vFile));
+        ffmpeg.FS('writeFile', inAudioName, await fetchFile(aFile));
+
+        progressMessage.innerText = '合併影音中...';
+
+        const args = [
+          '-i', inVideoName,
+          '-i', inAudioName,
+          '-c:v', 'copy',
+          '-c:a', 'copy',
+          '-shortest',
+          outName
+        ];
+
+        await ffmpeg.run(...args);
+
+        const data = ffmpeg.FS('readFile', outName);
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+
+        showResult(blob, outName, 'video');
+
+        ffmpeg.FS('unlink', inVideoName);
+        ffmpeg.FS('unlink', inAudioName);
+        ffmpeg.FS('unlink', outName);
+      } catch (err) {
+        console.error(err);
+        alert('合併失敗：' + (err.message || err));
+        hideProgress();
+      }
+    }
+
+    // 3. 轉為動畫
+    async function handleMakeAnimation() {
+      if (!isReady) return alert('核心尚未準備完成，請稍候。');
+      const fileInput = document.getElementById('gifFile');
+      if (!fileInput.files || !fileInput.files[0]) return alert('請先選取影片檔案。');
+
+      const file = fileInput.files[0];
+      const ext = getExt(file.name) || '.mp4';
+      const baseName = getBaseName(file.name);
+      const inputName = `input_gif${ext}`;
+
+      const s = parseFloat(document.getElementById('gifSliderStart').value) || 0;
+      const e = parseFloat(document.getElementById('gifSliderEnd').value) || 0;
+      const width = document.getElementById('gifWidth').value;
+      const fps = document.getElementById('gifFps').value;
+      const format = document.getElementById('gifFormat').value;
+
+      showProgress('載入影片資料中...');
+
+      try {
+        ffmpeg.FS('writeFile', inputName, await fetchFile(file));
+
+        let args = [];
+        if (s > 0) args.push('-ss', s.toString());
+        if (e > s) args.push('-to', e.toString());
+        args.push('-i', inputName);
+
+        const outName = `${baseName}_anim.${format}`;
+        const scaleFilter = width === '-1' ? '' : `scale=${width}:-1:flags=lanczos,`;
+
+        if (format === 'gif') {
+          progressMessage.innerText = '生成高品質 GIF 中...';
+          const filter = `[0:v]fps=${fps},${scaleFilter}split[a][b];[a]palettegen[p];[b][p]paletteuse`;
+          args.push('-filter_complex', filter, outName);
+        } else {
+          progressMessage.innerText = '生成 WebP 動畫中...';
+          const filter = `fps=${fps},${scaleFilter}`.replace(/,$/, '');
+          args.push('-vf', filter, '-loop', '0', outName);
+        }
+
+        await ffmpeg.run(...args);
+
+        const data = ffmpeg.FS('readFile', outName);
+        const mime = format === 'gif' ? 'image/gif' : 'image/webp';
+        const blob = new Blob([data.buffer], { type: mime });
+
+        showResult(blob, outName, 'image');
+
+        ffmpeg.FS('unlink', inputName);
+        ffmpeg.FS('unlink', outName);
+      } catch (err) {
+        console.error(err);
+        alert('轉換動畫失敗：' + (err.message || err));
+        hideProgress();
+      }
+    }
+  </script>
+</body>
+</html>
