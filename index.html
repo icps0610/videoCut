@@ -726,7 +726,8 @@
           statusText.innerText = '正在載入核心...';
           ffmpeg = createFFmpeg({
             log: true,
-            corePath: path
+            corePath: path,
+            mainName: 'main'
           });
 
           ffmpeg.setProgress(({ ratio }) => {
